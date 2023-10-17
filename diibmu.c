@@ -1,9 +1,6 @@
 #include "math.h"
 #include "raylib.h"
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-
 typedef enum { SET, COUNTDOWN, ALARM, PAUSE } TimerState;
 
 void DrawClock(Vector2 center, float radius, float minutes, TimerState state) {
@@ -57,18 +54,23 @@ void DrawClock(Vector2 center, float radius, float minutes, TimerState state) {
 int main(int argc, char *argv[]) {
   int screenWidth = 600;
   int screenHeight = 600;
-  SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-  InitWindow(600, 600, "diibmu - visual timer");
-  SetWindowMinSize(600, 600);
+
+  InitWindow(screenWidth, screenHeight, "diibmu - visual timer");
+  SetWindowMinSize(screenWidth / 2, screenHeight / 2);
+  // todo: I guess we can go a whole lot lower
+  // unless we want some fancy animations
   SetTargetFPS(60);
 
   Vector2 center = (Vector2){screenWidth / 2, screenHeight / 2};
   float minutesToDraw = 60.0f;
-  float minutesSet = 60.0f;
+  float minutesSet = 30.0f;
+  float elapsedMinutes = 0.0f;
+  double startTime = 0.0f;
   TimerState timerState = SET;
   while (!WindowShouldClose()) {
     switch (timerState) {
     case SET: {
+      // TODO: Swap this with IsKeyDown + debounce
       switch (GetKeyPressed()) {
       case KEY_J:
       case KEY_DOWN:
@@ -79,34 +81,74 @@ int main(int argc, char *argv[]) {
         minutesSet += 1.0f;
         break;
       case KEY_ENTER:
+        startTime = GetTime();
         timerState = COUNTDOWN;
         break;
       }
-
-      if (minutesSet < 1) {
+      if (minutesSet < 1)
         minutesSet = 1;
-      } else if (minutesSet > 60) {
+      if (minutesSet > 60)
         minutesSet = 60;
-      }
-
       minutesToDraw = minutesSet;
       break;
     }
     case COUNTDOWN: {
+      elapsedMinutes = (float)(GetTime() - startTime) / 60.0f;
+      minutesToDraw = minutesSet - elapsedMinutes;
+
+      if (minutesToDraw <= 0) {
+        minutesToDraw = 0;
+        timerState = ALARM;
+      }
+
+      if (IsKeyPressed(KEY_P) || IsKeyPressed(KEY_SPACE)) {
+        startTime = GetTime();
+        timerState = PAUSE;
+      }
       break;
     }
     case PAUSE: {
+      if (IsKeyPressed(KEY_P) || IsKeyPressed(KEY_SPACE)) {
+        startTime = GetTime() - elapsedMinutes * 60.0f;
+        timerState = COUNTDOWN;
+      }
+      if (IsKeyPressed(KEY_X) || IsKeyPressed(KEY_DELETE) ||
+          IsKeyPressed(KEY_BACKSPACE)) {
+        timerState = SET;
+      }
       break;
     }
     case ALARM: {
+      // TODO: Play shound
+      if (GetKeyPressed() != 0) {
+        timerState = SET;
+      }
       break;
     }
     default:
       break;
     }
 
+    // TODO: draw dialog when ? is being held down
+
     BeginDrawing();
-    ClearBackground(WHITE);
+    ClearBackground(RAYWHITE);
+    switch (timerState) {
+    case PAUSE: {
+      // TODO: draw as a centered dialog box or something
+      DrawText("Paused", center.x - MeasureText("Paused", 40) / 2, 0, 40,
+               BLACK);
+      break;
+    }
+    case ALARM: {
+      // TODO: draw as a centered dialog box or something
+      DrawText("Time is up", center.x - MeasureText("Time is up", 40) / 2, 0,
+               40, BLACK);
+      break;
+    }
+    default:
+      break;
+    }
     DrawText("diibmu", 10, 25, 40, BLACK);
     DrawClock(center, 200, minutesToDraw, timerState);
     EndDrawing();
